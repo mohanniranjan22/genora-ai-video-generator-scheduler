@@ -31,9 +31,16 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen items-center justify-center bg-background text-foreground gap-4">
-      <h1 className="text-3xl font-bold">Welcome to Genora Dashboard!</h1>
-      <p className="text-muted-foreground">Your account has been synced to Supabase successfully.</p>
+    <div className="max-w-5xl mx-auto">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome back, {user?.firstName || "Creator"}! 👋</h1>
+        <p className="text-gray-500 mb-8">Ready to generate your next viral short video?</p>
+        
+        <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50 text-center px-4">
+          <p className="text-gray-500 font-medium mb-2">You don't have any active series yet.</p>
+          <p className="text-gray-400 text-sm">Click "+ Create New Series" in the sidebar to start automating your videos.</p>
+        </div>
+      </div>
     </div>
   )
 }
