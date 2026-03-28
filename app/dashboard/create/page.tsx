@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Check, ChevronRight, Sparkles, Ghost, Zap, Brain,
   Flame, Globe, Leaf, BookOpen, Rocket, Heart,
-  Play, Pause, Volume2, User, Mail
+  Play, Pause, Volume2, User, Mail, Clock
 } from "lucide-react";
+import { createClient } from "@/utils/supabase/client";
+import { PLATFORM_OPTIONS } from "@/lib/series-constants";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const STEPS = [
@@ -17,12 +20,7 @@ const STEPS = [
   { id: 6, label: "Schedule" },
 ];
 
-const Youtube = (props: any) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" {...props}><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" /></svg>
-);
-const Instagram = (props: any) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" {...props}><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" /></svg>
-);
+
 
 const CAPTION_STYLES = [
   { id: "modern-yellow", name: "Modern Yellow", style: "text-[#FCFF00] font-black uppercase [text-shadow:4px_4px_0_#000] text-3xl", animation: "animate-pulse" },
@@ -129,7 +127,7 @@ const AVAILABLE_NICHES = [
 ];
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-interface SeriesData {
+export interface SeriesData {
   niche: string | null;
   customNiche: string;
   nicheType: "available" | "custom";
@@ -142,6 +140,7 @@ interface SeriesData {
   duration: string;
   platforms: string[];
   publishTime: string;
+  status?: string;
 }
 
 const INITIAL_DATA: SeriesData = {
@@ -157,6 +156,7 @@ const INITIAL_DATA: SeriesData = {
   duration: "30-50 sec video",
   platforms: [],
   publishTime: "18:00",
+  status: "active",
 };
 
 // ─── Shared Components ─────────────────────────────────────────────────────────
@@ -561,18 +561,9 @@ function CaptionStyleStep({ data, updateData, onNext, onBack }: { data: SeriesDa
   );
 }
 
-const PLATFORM_OPTIONS = [
-  { id: "Tiktok", name: "Tiktok", icon: (props: any) => (
-    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
-    </svg>
-  )},
-  { id: "Youtube", name: "Youtube", icon: Youtube },
-  { id: "Instagram", name: "Instagram", icon: Instagram },
-  { id: "Email", name: "Email", icon: Mail },
-];
 
-function ScheduleStep({ data, updateData, onComplete, onBack }: { data: SeriesData; updateData: (updates: Partial<SeriesData>) => void; onComplete: () => void; onBack: () => void; }) {
+
+function ScheduleStep({ data, updateData, onComplete, onBack, isLoading }: { data: SeriesData; updateData: (updates: Partial<SeriesData>) => void; onComplete: () => void; onBack: () => void; isLoading: boolean; }) {
   const canContinue = data.seriesName.trim().length > 0 && data.platforms.length > 0 && !!data.publishTime;
 
   const togglePlatform = (platform: string) => {
@@ -649,12 +640,17 @@ function ScheduleStep({ data, updateData, onComplete, onBack }: { data: SeriesDa
         <div>
           <label className="block text-sm font-semibold text-gray-700 mb-2">Publish Time</label>
           <div className="flex flex-col gap-3">
-            <input
-              type="time"
-              value={data.publishTime}
-              onChange={(e) => updateData({ publishTime: e.target.value })}
-              className="w-full h-12 px-4 border-2 border-gray-100 rounded-xl text-sm font-medium focus:outline-none focus:border-purple-500 transition-colors"
-            />
+            <div className="relative">
+              <input
+                type="time"
+                value={data.publishTime}
+                onChange={(e) => updateData({ publishTime: e.target.value })}
+                className="w-full h-12 pl-4 pr-12 border-2 border-gray-100 rounded-xl text-sm font-medium focus:outline-none focus:border-purple-500 transition-colors bg-white"
+              />
+              <div className="absolute right-12 top-1/2 -translate-y-1/2 pointer-events-none">
+                <Clock className="w-5 h-5 text-gray-400" />
+              </div>
+            </div>
             <p className="text-xs text-amber-600 font-medium flex items-center gap-1.5 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">
               <Sparkles className="w-3.5 h-3.5" /> Video will generate 3-6 hours before video publish
             </p>
@@ -663,34 +659,119 @@ function ScheduleStep({ data, updateData, onComplete, onBack }: { data: SeriesDa
       </div>
 
       <div className="mt-auto pt-6 flex items-center justify-between border-t border-gray-100">
-        <button onClick={onBack} className="flex items-center gap-2 h-12 px-6 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition-all duration-200">
+        <button onClick={onBack} disabled={isLoading} className="flex items-center gap-2 h-12 px-6 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition-all duration-200 disabled:opacity-50">
           Back
         </button>
         <button
           onClick={onComplete}
-          disabled={!canContinue}
-          className="flex items-center gap-2 h-12 px-10 rounded-xl bg-purple-600 text-white font-bold text-sm hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 shadow-[0_4px_14px_0_rgba(168,85,247,0.39)] group"
+          disabled={!canContinue || isLoading}
+          className="flex items-center gap-2 h-12 px-10 rounded-xl bg-purple-600 text-white font-bold text-sm hover:bg-purple-700 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200 shadow-[0_4px_14px_0_rgba(168,85,247,0.39)] group"
         >
-          Schedule <Zap className="w-4 h-4 fill-white group-hover:animate-pulse" />
+          {isLoading ? (
+            <span className="flex items-center gap-2">
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Saving...
+            </span>
+          ) : (
+            <>Schedule <Zap className="w-4 h-4 fill-white group-hover:animate-pulse" /></>
+          )}
         </button>
       </div>
     </div>
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
-export default function CreateSeriesPage() {
+// ─── Main Page Content ────────────────────────────────────────────────────────
+function CreateSeriesContent() {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<SeriesData>(INITIAL_DATA);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get('edit');
+  const supabase = createClient();
+
+  // Fetch series data if in edit mode
+  useEffect(() => {
+    async function fetchSeries() {
+      if (!editId) return;
+      
+      setIsFetching(true);
+      try {
+        const { data: series, error } = await supabase
+          .from('video_series')
+          .select('*')
+          .eq('id', editId)
+          .single();
+
+        if (error) throw error;
+
+        if (series) {
+          setFormData({
+            seriesName: series.series_name,
+            niche: series.niche,
+            customNiche: series.custom_niche,
+            nicheType: series.niche_type as any,
+            language: series.language,
+            voice: series.voice,
+            backgroundMusic: series.background_music,
+            videoStyle: series.video_style,
+            captionStyle: series.caption_style,
+            duration: series.duration,
+            platforms: series.platforms,
+            publishTime: series.publish_time,
+            status: series.status,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching series:", error);
+        alert("Failed to load series data for editing.");
+      } finally {
+        setIsFetching(false);
+      }
+    }
+
+    fetchSeries();
+  }, [editId, supabase]);
 
   const updateData = (updates: Partial<SeriesData>) => setFormData(prev => ({ ...prev, ...updates }));
   const handleNext = () => setCurrentStep(prev => Math.min(prev + 1, STEPS.length));
   const handleBack = () => setCurrentStep(prev => Math.max(prev - 1, 1));
-  const handleComplete = () => {
-    console.log("Series Scheduled:", formData);
-    setIsCompleted(true);
+  
+  const handleComplete = async () => {
+    setIsLoading(true);
+    try {
+      const payload = editId ? { ...formData, id: editId } : formData;
+      const response = await fetch('/api/create-series', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        setIsCompleted(true);
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to save series: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error("Save error:", error);
+      alert("An unexpected error occurred while saving.");
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  if (isFetching) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px]">
+        <div className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-4" />
+        <p className="text-gray-500 font-medium">Loading series details...</p>
+      </div>
+    );
+  }
 
   if (isCompleted) {
     return (
@@ -727,9 +808,23 @@ export default function CreateSeriesPage() {
           {currentStep === 3 && <MusicStep data={formData} updateData={updateData} onNext={handleNext} onBack={handleBack} />}
           {currentStep === 4 && <VideoStyleStep data={formData} updateData={updateData} onNext={handleNext} onBack={handleBack} />}
           {currentStep === 5 && <CaptionStyleStep data={formData} updateData={updateData} onNext={handleNext} onBack={handleBack} />}
-          {currentStep === 6 && <ScheduleStep data={formData} updateData={updateData} onComplete={handleComplete} onBack={handleBack} />}
+          {currentStep === 6 && <ScheduleStep data={formData} updateData={updateData} onComplete={handleComplete} onBack={handleBack} isLoading={isLoading} />}
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+export default function CreateSeriesPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-[400px]">
+        <div className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-4" />
+        <p className="text-gray-500 font-medium">Preparing creation wizard...</p>
+      </div>
+    }>
+      <CreateSeriesContent />
+    </Suspense>
   );
 }
