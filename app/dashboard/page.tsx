@@ -1,6 +1,8 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createAdminClient } from "@/utils/supabase/admin";
+import SeriesList from "@/components/dashboard/SeriesList";
 
 export default async function DashboardPage() {
   const { userId } = await auth();
@@ -8,39 +10,49 @@ export default async function DashboardPage() {
     redirect("/");
   }
 
-  // Lazy sync user to Supabase
+  // Sync user and fetch series
   const user = await currentUser();
+  const supabase = createAdminClient();
+
   if (user) {
-    const supabase = createAdminClient();
-    
-    // Search by user_id since id is an auto-incrementing bigint
     const { data: existingUser } = await supabase.from('users').select('user_id').eq('user_id', userId).single();
-    
     if (!existingUser) {
       const email = user.emailAddresses?.[0]?.emailAddress || "";
-      const { error } = await supabase.from('users').insert({
+      await supabase.from('users').insert({
         user_id: userId,
-        email: email,
         name: `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+        email: email,
       });
-      
-      if (error) {
-        console.error("Error inserting user into Supabase:", error);
-      }
     }
   }
 
+  const { data: series } = await supabase
+    .from('video_series')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome back, {user?.firstName || "Creator"}! 👋</h1>
-        <p className="text-gray-500 mb-8">Ready to generate your next viral short video?</p>
-        
-        <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50 text-center px-4">
-          <p className="text-gray-500 font-medium mb-2">You don't have any active series yet.</p>
-          <p className="text-gray-400 text-sm">Click "+ Create New Series" in the sidebar to start automating your videos.</p>
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
+        <div>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tight">
+            Welcome back, {user?.firstName || "Creator"}! 👋
+          </h1>
+          <p className="text-gray-500 mt-1 font-medium italic">Ready to scale your content today?</p>
         </div>
+        
+        {series && series.length > 0 && (
+          <Link 
+            href="/dashboard/create"
+            className="h-11 px-6 flex items-center justify-center rounded-xl bg-gray-900 text-white font-bold text-sm hover:bg-gray-800 transition-all shadow-lg shadow-gray-200"
+          >
+            + Create New Series
+          </Link>
+        )}
       </div>
+
+      <SeriesList series={series || []} />
     </div>
-  )
+  );
 }
