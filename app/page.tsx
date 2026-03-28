@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
 import { 
   Wand2, CalendarClock, Mail, 
   ArrowRight, PlayCircle, Zap, Sparkles, BarChart3, Clock
@@ -21,7 +23,9 @@ const Linkedin = (props: any) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
 );
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const { userId } = await auth();
+
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground font-sans overflow-x-hidden">
       {/* Header */}
@@ -39,10 +43,19 @@ export default function LandingPage() {
             <Link href="#pricing" className="hover:text-foreground transition-colors">Pricing</Link>
           </nav>
           <div className="flex items-center gap-4">
-            <Link href="/login" className="hidden md:block text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Log in</Link>
-            <Link href="/signup" className="h-9 px-4 flex items-center justify-center rounded-full bg-foreground text-background text-sm font-medium hover:opacity-90 transition-opacity">
-              Get Started
-            </Link>
+            {userId ? (
+              <>
+                <Link href="/dashboard" className="hidden md:flex h-9 px-4 items-center justify-center rounded-full bg-background border border-border text-foreground text-sm font-medium hover:bg-muted transition-colors">
+                  Dashboard
+                </Link>
+                <UserButton />
+              </>
+            ) : (
+              <>
+                <SignInButton mode="modal" fallbackRedirectUrl="/dashboard"><button className="hidden md:block text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Log in</button></SignInButton>
+                <SignUpButton mode="modal" fallbackRedirectUrl="/dashboard"><button className="h-9 px-4 flex items-center justify-center rounded-full bg-foreground text-background text-sm font-medium hover:opacity-90 transition-opacity">Get Started</button></SignUpButton>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -69,9 +82,13 @@ export default function LandingPage() {
             </p>
             
             <div className="flex flex-col sm:flex-row items-center gap-4">
-              <Link href="/signup" className="h-12 px-8 flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 text-white font-medium hover:opacity-90 transition-opacity shadow-[0_0_40px_rgba(147,51,234,0.3)] hover:shadow-[0_0_60px_rgba(147,51,234,0.5)]">
-                Start Generating Free <ArrowRight className="w-4 h-4" />
-              </Link>
+              {userId ? (
+                <Link href="/dashboard" className="h-12 px-8 flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 text-white font-medium hover:opacity-90 transition-opacity shadow-[0_0_40px_rgba(147,51,234,0.3)] hover:shadow-[0_0_60px_rgba(147,51,234,0.5)]">
+                  Go to Dashboard <ArrowRight className="w-4 h-4" />
+                </Link>
+              ) : (
+                <SignUpButton mode="modal" fallbackRedirectUrl="/dashboard"><button className="h-12 px-8 flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 text-white font-medium hover:opacity-90 transition-opacity shadow-[0_0_40px_rgba(147,51,234,0.3)] hover:shadow-[0_0_60px_rgba(147,51,234,0.5)]">Start Generating Free <ArrowRight className="w-4 h-4" /></button></SignUpButton>
+              )}
               <Link href="#demo" className="h-12 px-8 flex items-center justify-center gap-2 rounded-full bg-muted/50 hover:bg-muted border border-border text-foreground font-medium transition-colors">
                 <PlayCircle className="w-4 h-4" /> Watch Demo
               </Link>
@@ -90,27 +107,99 @@ export default function LandingPage() {
                 </div>
                 {/* Content mock */}
                 <div className="flex-1 p-6 flex flex-col gap-6">
+                  {/* Top Bar Mock */}
                   <div className="flex items-center justify-between">
-                    <div className="w-48 h-6 rounded bg-foreground/10" />
-                    <div className="w-24 h-8 rounded-full bg-purple-600/20 border border-purple-500/30" />
+                    <div>
+                      <h3 className="text-xl font-semibold text-foreground tracking-tight">Analytics Overview</h3>
+                      <p className="text-xs text-muted-foreground mt-1">Last 7 days performance</p>
+                    </div>
+                    <div className="hidden sm:flex text-sm font-medium text-white px-4 py-2 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 shadow-lg shadow-purple-500/20">
+                      Generate New Video
+                    </div>
                   </div>
+                  
+                  {/* Stats Cards */}
                   <div className="flex gap-4">
-                    <div className="flex-1 h-32 rounded-xl border border-border bg-gradient-to-br from-foreground/5 to-transparent p-4 flex flex-col justify-between">
-                      <Youtube className="text-red-500 w-6 h-6" />
-                      <div className="w-24 h-2 rounded bg-foreground/20" />
+                    <div className="flex-1 h-32 rounded-xl border border-border bg-gradient-to-br from-red-500/5 to-transparent p-4 flex flex-col justify-between relative overflow-hidden group">
+                      <div className="flex justify-between items-start">
+                        <Youtube className="text-[#FF0000] w-6 h-6" />
+                        <span className="text-xs font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full">+124%</span>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-foreground">1.2M</div>
+                        <div className="text-xs text-muted-foreground mt-1">Total YouTube Views</div>
+                      </div>
                     </div>
-                    <div className="flex-1 h-32 rounded-xl border border-border bg-gradient-to-br from-foreground/5 to-transparent p-4 flex flex-col justify-between">
-                      <Instagram className="text-pink-500 w-6 h-6" />
-                      <div className="w-24 h-2 rounded bg-foreground/20" />
+                    <div className="flex-1 h-32 rounded-xl border border-border bg-gradient-to-br from-pink-500/5 to-transparent p-4 flex flex-col justify-between relative overflow-hidden group">
+                      <div className="flex justify-between items-start">
+                        <Instagram className="text-[#E1306C] w-6 h-6" />
+                        <span className="text-xs font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full">+82%</span>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-foreground">450K</div>
+                        <div className="text-xs text-muted-foreground mt-1">Instagram Reach</div>
+                      </div>
                     </div>
-                    <div className="flex-1 h-32 rounded-xl border border-border bg-gradient-to-br from-foreground/5 to-transparent p-4 flex flex-col justify-between hidden sm:flex">
-                      <Clock className="text-blue-500 w-6 h-6" />
-                      <div className="w-24 h-2 rounded bg-foreground/20" />
+                    <div className="flex-1 h-32 rounded-xl border border-border bg-gradient-to-br from-zinc-500/5 to-transparent p-4 flex flex-col justify-between relative overflow-hidden group hidden sm:flex">
+                      <div className="flex justify-between items-start">
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="text-zinc-300 w-6 h-6"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a5.63 5.63 0 0 1-1.04-.1z" /></svg>
+                        <span className="text-xs font-semibold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded-full">+200%</span>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-foreground">8.9M</div>
+                        <div className="text-xs text-muted-foreground mt-1">TikTok Impressions</div>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex-1 rounded-xl border border-border bg-background flex items-center justify-center shadow-inner">
-                    <div className="w-16 h-16 rounded-full bg-foreground/5 border border-border flex items-center justify-center">
-                      <PlayCircle className="w-8 h-8 text-foreground/40" />
+
+                  {/* Feed Mock */}
+                  <div className="flex-1 rounded-xl border border-border bg-background flex flex-col overflow-hidden shadow-inner relative">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 via-blue-500 to-emerald-500" />
+                    <div className="px-6 py-4 border-b border-border flex justify-between items-center bg-muted/30">
+                      <span className="font-medium text-sm text-foreground">Upcoming AI Schedule</span>
+                      <span className="text-xs bg-purple-500/20 text-purple-400 px-3 py-1 rounded-full border border-purple-500/20">Autopilot Active</span>
+                    </div>
+                    
+                    <div className="flex-1 flex flex-col">
+                      <div className="flex items-center justify-between p-4 border-b border-border hover:bg-muted/10 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center border border-red-500/20">
+                            <Youtube className="w-5 h-5 text-[#FF0000]" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold text-foreground">Top 10 AI Tools 2026</div>
+                            <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 text-purple-400" /> Script & Voice Generated
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-emerald-400 flex items-center gap-1 justify-end">
+                            <Clock className="w-3 h-3" /> Scheduled
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">Today, 2:00 PM</div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-4 hover:bg-muted/10 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-lg bg-pink-500/10 flex items-center justify-center border border-pink-500/20">
+                            <Instagram className="w-5 h-5 text-[#E1306C]" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-semibold text-foreground">SaaS Marketing Hooks</div>
+                            <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                              <Zap className="w-3 h-3 text-blue-400" /> Rendering video...
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium text-blue-400 animate-pulse flex items-center gap-1 justify-end">
+                            <PlayCircle className="w-3 h-3" /> Processing
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">Tomorrow, 9:00 AM</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -180,9 +269,13 @@ export default function LandingPage() {
           <div className="container mx-auto px-6 relative z-10 text-center">
             <h2 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight">Ready to 10x your content output?</h2>
             <p className="text-xl text-muted-foreground mb-10 max-w-2xl mx-auto">Join thousands of creators and marketers using Genora to automate their short-form video strategies.</p>
-            <Link href="/signup" className="inline-flex h-14 px-10 items-center justify-center gap-2 rounded-full bg-foreground text-background font-semibold text-lg hover:opacity-90 transition-opacity shadow-[0_0_40px_rgba(255,255,255,0.1)] dark:shadow-[0_0_40px_rgba(255,255,255,0.2)]">
-              Get Started for Free <ArrowRight className="w-5 h-5" />
-            </Link>
+            {userId ? (
+              <Link href="/dashboard" className="inline-flex h-14 px-10 items-center justify-center gap-2 rounded-full bg-foreground text-background font-semibold text-lg hover:opacity-90 transition-opacity shadow-[0_0_40px_rgba(255,255,255,0.1)] dark:shadow-[0_0_40px_rgba(255,255,255,0.2)]">
+                Go to Dashboard <ArrowRight className="w-5 h-5" />
+              </Link>
+            ) : (
+              <SignUpButton mode="modal" fallbackRedirectUrl="/dashboard"><button className="inline-flex h-14 px-10 items-center justify-center gap-2 rounded-full bg-foreground text-background font-semibold text-lg hover:opacity-90 transition-opacity shadow-[0_0_40px_rgba(255,255,255,0.1)] dark:shadow-[0_0_40px_rgba(255,255,255,0.2)]">Get Started for Free <ArrowRight className="w-5 h-5" /></button></SignUpButton>
+            )}
             <p className="mt-4 text-sm text-muted-foreground">No credit card required • 14-day free trial</p>
           </div>
         </section>
