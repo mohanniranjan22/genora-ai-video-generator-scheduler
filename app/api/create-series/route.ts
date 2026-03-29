@@ -31,7 +31,11 @@ export async function POST(req: NextRequest) {
         duration: data.duration,
         platforms: data.platforms,
         publish_time: data.publishTime,
-        status: data.status || "active"
+        status: data.status || "active",
+        // New model metadata
+        model_name: data.modelName,
+        model_language: data.modelLanguage,
+        model_language_code: data.modelLanguageCode
       });
 
     if (error) {

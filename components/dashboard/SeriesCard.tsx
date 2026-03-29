@@ -13,11 +13,41 @@ import {
 } from "@/components/ui/popover";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { PLATFORM_OPTIONS, VIDEO_STYLE_MAP } from "@/lib/series-constants";
+import { toast } from "sonner";
 
 export default function SeriesCard({ series }: { series: any }) {
+  const router = useRouter();
   const [isPaused, setIsPaused] = useState(series.status === "paused");
+  const [isGenerating, setIsGenerating] = useState(series.latestStatus === "processing");
   const thumbnail = VIDEO_STYLE_MAP[series.video_style || "realistic"] || VIDEO_STYLE_MAP.realistic;
+
+  const handleTriggerGeneration = async () => {
+    setIsGenerating(true);
+    const toastId = toast.loading("Triggering video generation...");
+    
+    try {
+      const response = await fetch("/api/generate-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seriesId: series.id }),
+      });
+
+      if (response.ok) {
+        toast.success("Generation started!", { id: toastId });
+        router.push("/dashboard/videos");
+      } else {
+        const error = await response.json();
+        toast.error(`Error: ${error.error || "Failed to trigger"}`, { id: toastId });
+      }
+    } catch (error) {
+      console.error("Trigger error:", error);
+      toast.error("Internal server error", { id: toastId });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
@@ -138,10 +168,10 @@ export default function SeriesCard({ series }: { series: any }) {
           </div>
           <div className="flex flex-col gap-1">
             <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tight flex items-center gap-1">
-              <RotateCw className="w-3 h-3" /> Next Gen
+            <RotateCw className={`w-3 h-3 ${isGenerating ? "animate-spin" : ""}`} /> Next Gen
             </span>
-            <span className="text-[11px] font-bold text-amber-600 flex items-center gap-1">
-              Pending
+            <span className={`text-[11px] font-bold flex items-center gap-1 ${isGenerating ? "text-purple-600" : "text-amber-600"}`}>
+              {isGenerating ? "Generating..." : "Pending"}
             </span>
           </div>
         </div>
@@ -152,11 +182,18 @@ export default function SeriesCard({ series }: { series: any }) {
             <span className="text-xs font-bold flex items-center gap-1.5 text-gray-500">
               <ExternalLink className="w-3 h-3" /> Previous Videos
             </span>
-            <span className="text-[10px] font-black bg-gray-200 px-1.5 py-0.5 rounded-md text-gray-500 uppercase tracking-tighter">0 Videos</span>
+            <span className="text-[10px] font-black bg-gray-200 px-1.5 py-0.5 rounded-md text-gray-500 uppercase tracking-tighter">{series.videoCount || 0} Videos</span>
           </button>
           
-          <button className="w-full h-10 px-4 flex items-center justify-center gap-2 rounded-xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 transition-all shadow-md shadow-purple-100/50 group/gen">
-            <Zap className="w-3.5 h-3.5 fill-white group-hover/gen:animate-pulse" /> Trigger Generation
+          <button 
+            onClick={handleTriggerGeneration}
+            disabled={isGenerating}
+            className={`w-full h-10 px-4 flex items-center justify-center gap-2 rounded-xl text-white font-bold text-xs transition-all shadow-md group/gen ${
+              isGenerating ? "bg-purple-400 cursor-not-allowed" : "bg-purple-600 hover:bg-purple-700 shadow-purple-100/50"
+            }`}
+          >
+            <Zap className={`w-3.5 h-3.5 fill-white ${isGenerating ? "animate-spin" : "group-hover/gen:animate-pulse"}`} /> 
+            {isGenerating ? "Generating..." : "Trigger Generation"}
           </button>
         </div>
       </div>
