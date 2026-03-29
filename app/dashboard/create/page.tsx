@@ -141,6 +141,9 @@ export interface SeriesData {
   platforms: string[];
   publishTime: string;
   status?: string;
+  modelName?: string;
+  modelLanguage?: string;
+  modelLanguageCode?: string;
 }
 
 const INITIAL_DATA: SeriesData = {
@@ -157,6 +160,9 @@ const INITIAL_DATA: SeriesData = {
   platforms: [],
   publishTime: "18:00",
   status: "active",
+  modelName: "",
+  modelLanguage: "English",
+  modelLanguageCode: "en-US",
 };
 
 // ─── Shared Components ─────────────────────────────────────────────────────────
@@ -335,7 +341,19 @@ function VoiceStep({ data, updateData, onNext, onBack }: { data: SeriesData; upd
             <Globe className="w-4 h-4 text-purple-600" /> Select Language
           </label>
           <div className="relative">
-            <select value={data.language} onChange={(e) => updateData({ language: e.target.value, voice: "" })} className="w-full h-12 pl-4 pr-10 py-2 border-2 border-gray-100 rounded-xl bg-white text-gray-800 font-medium focus:outline-none focus:border-purple-500 appearance-none cursor-pointer transition-colors shadow-sm">
+            <select
+              value={data.language}
+              onChange={(e) => {
+                const lang = LANGUAGES.find(l => l.language === e.target.value);
+                updateData({
+                  language: e.target.value,
+                  voice: "",
+                  modelLanguage: lang?.language,
+                  modelLanguageCode: lang?.modelLangCode
+                });
+              }}
+              className="w-full h-12 pl-4 pr-10 py-2 border-2 border-gray-100 rounded-xl bg-white text-gray-800 font-medium focus:outline-none focus:border-purple-500 appearance-none cursor-pointer transition-colors shadow-sm"
+            >
               {LANGUAGES.map((lang) => (
                 <option key={lang.language} value={lang.language}>{lang.countryFlag} &nbsp; {lang.language}</option>
               ))}
@@ -364,7 +382,14 @@ function VoiceStep({ data, updateData, onNext, onBack }: { data: SeriesData; upd
             const isPlaying = playingVoice === voice.preview;
             const displayName = voice.modelName.replace("aura-2-", "").replace("-en", "");
             return (
-              <div key={voice.modelName} onClick={() => updateData({ voice: voice.modelName })} className={`group flex items-center justify-between p-4 rounded-2xl border-2 transition-all duration-300 cursor-pointer ${isSelected ? "border-purple-500 bg-white shadow-sm ring-1 ring-purple-500/10" : "border-gray-100 bg-white hover:border-purple-200"}`}>
+              <div
+                key={voice.modelName}
+                onClick={() => updateData({
+                  voice: voice.modelName,
+                  modelName: voice.model
+                })}
+                className={`group flex items-center justify-between p-4 rounded-2xl border-2 transition-all duration-300 cursor-pointer ${isSelected ? "border-purple-500 bg-white shadow-sm ring-1 ring-purple-500/10" : "border-gray-100 bg-white hover:border-purple-200"}`}
+              >
                 <div className="min-w-0">
                   <p className={`font-bold text-base mb-1.5 transition-colors ${isSelected ? "text-purple-700" : "text-gray-900 group-hover:text-purple-600"}`}>{displayName.charAt(0).toUpperCase() + displayName.slice(1)}</p>
                   <div className="flex items-center gap-2">
@@ -723,6 +748,9 @@ function CreateSeriesContent() {
             platforms: series.platforms,
             publishTime: series.publish_time,
             status: series.status,
+            modelName: series.model_name,
+            modelLanguage: series.model_language,
+            modelLanguageCode: series.model_language_code,
           });
         }
       } catch (error) {

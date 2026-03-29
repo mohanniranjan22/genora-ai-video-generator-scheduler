@@ -28,9 +28,30 @@ export default async function DashboardPage() {
 
   const { data: series } = await supabase
     .from('video_series')
-    .select('*')
+    .select(`
+      *,
+      video_records (
+        id,
+        status,
+        created_at
+      )
+    `)
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
+
+  // Add derived properties for the UI
+  const seriesWithMeta = series?.map(s => {
+    const records = s.video_records || [];
+    const latestRecord = records.sort((a: any, b: any) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )[0];
+    
+    return {
+      ...s,
+      videoCount: records.length,
+      latestStatus: latestRecord?.status || 'idle'
+    };
+  });
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
@@ -52,7 +73,7 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      <SeriesList series={series || []} />
+      <SeriesList series={seriesWithMeta || []} />
     </div>
   );
 }
