@@ -326,11 +326,54 @@ export const generateVideo = inngest.createFunction(
       return imageUrls;
     });
 
+    // 8. Render Final Video (Remotion + AWS Lambda)
+    const finalVideoUrl = await step.run("render-final-video", async () => {
+      const { renderVideo } = await import("@/lib/remotion/lambda");
+      const supabase = createAdminClient();
+
+      // Fetch the record to get episode number and any other meta
+      const { data: videoRecord } = await supabase
+        .from("video_records")
+        .select("episode_number")
+        .eq("id", recordId)
+        .single();
+      
+      // Calculate duration from Deepgram
+      const lastWord = captions[captions.length - 1];
+      const durationSeconds = lastWord ? lastWord.end + 1 : 30; // 1s buffer
+      const durationInFrames = Math.ceil(durationSeconds * 30);
+
+      const videoUrl = await renderVideo({
+        audioUrl: voiceUrl,
+        imageUrls: generatedImages,
+        captions: captions,
+        captionStyle: series.caption_style || "modern-yellow",
+        seriesName: series.series_name,
+        episodeNumber: videoRecord?.episode_number || 1,
+        durationInFrames
+      });
+
+      if (!videoUrl) throw new Error("Video rendering failed or returned null URL");
+
+      // Final update to the video record with the playable MP4 URL
+      const { error: updateError } = await supabase
+        .from("video_records")
+        .update({ 
+          final_video_url: videoUrl,
+          status: "completed" 
+        })
+        .eq("id", recordId);
+
+      if (updateError) throw new Error(`Failed to finalize video_record with URL: ${updateError.message}`);
+
+      return videoUrl;
+    });
+
     return { 
-      message: "Video generation complete. All assets saved.",
+      message: "Full automation complete! Video is ready.",
       seriesId,
       recordId,
-      voiceUrl,
+      finalVideoUrl,
       imagesCount: generatedImages.length
     };
   }

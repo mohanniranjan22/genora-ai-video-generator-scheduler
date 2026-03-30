@@ -16,11 +16,13 @@ export default function VideoList({ initialVideos, userId }: VideoListProps) {
   const supabase = createClient();
 
   const fetchVideos = useCallback(async () => {
+    if (!userId) return;
+
     const { data, error } = await supabase
       .from('video_records')
       .select(`
         *,
-        video_series!inner (
+        video_series (
           series_name,
           user_id
         ),
@@ -30,19 +32,28 @@ export default function VideoList({ initialVideos, userId }: VideoListProps) {
           asset_index
         )
       `)
-      .eq('video_series.user_id', userId)
       .order('created_at', { ascending: false });
 
-    if (!error && data) {
+    if (error) {
+      console.error("Fetch videos client error:", error);
+      setIsPolling(false);
+      return;
+    }
+
+    if (data && data.length > 0) {
       setVideos(data);
       
-      // Stop polling if no videos are in 'processing' state
+      // Stop polling if NO videos are in 'processing' state in the NEW data
       const hasProcessing = data.some((v: any) => v.status === 'processing');
       if (!hasProcessing) {
         setIsPolling(false);
       }
+    } else if (data && data.length === 0 && videos.length === 0) {
+      // Only set to zero if we were already empty to avoid overwriting server data
+      setVideos([]);
+      setIsPolling(false);
     }
-  }, [userId, supabase]);
+  }, [userId, supabase, videos.length]);
 
   useEffect(() => {
     // Check if we need to start polling
