@@ -1,4 +1,4 @@
-import { Youtube, Instagram, Mail } from "lucide-react";
+import { Mail } from "lucide-react";
 
 // --- Custom SVG Icons ---
 export const YoutubeIcon = ({ className }: { className?: string }) => (
