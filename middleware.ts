@@ -4,6 +4,11 @@ import { updateSession } from '@/utils/supabase/middleware'
 const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)', '/api/inngest(.*)'])
 
 export default clerkMiddleware(async (auth, req) => {
+  // Completely bypass everything for Inngest to ensure clean header signing
+  if (req.nextUrl.pathname.startsWith('/api/inngest')) {
+    return
+  }
+
   if (!isPublicRoute(req)) {
       await auth.protect()
   }
