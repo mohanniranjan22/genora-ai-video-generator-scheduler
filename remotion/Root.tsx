@@ -14,10 +14,11 @@ export const RemotionRoot: React.FC = () => {
         schema={MainPropsSchema}
         defaultProps={{
           audioUrl: "",
-          imageUrls: [],
-          captions: [],
+          imageUrls: [] as string[],
+          captions: [] as { word: string; start: number; end: number; confidence: number }[],
           seriesName: "Genora",
           episodeNumber: 1,
+          captionStyle: "modern-yellow",
         }}
       />
     </>
