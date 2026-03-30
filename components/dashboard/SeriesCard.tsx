@@ -119,12 +119,29 @@ export default function SeriesCard({ series }: { series: any }) {
                 <Link href={`/dashboard/create?edit=${series.id}`} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 hover:text-purple-600 transition-all">
                   <Edit3 className="w-4 h-4" /> Edit Series
                 </Link>
-                <button 
-                  onClick={() => setIsPaused(!isPaused)}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 hover:text-purple-600 transition-all"
-                >
+                <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 hover:text-purple-600 transition-all">
                   {isPaused ? <><Play className="w-4 h-4" /> Resume Series</> : <><Pause className="w-4 h-4" /> Pause Series</>}
                 </button>
+                {isGenerating && (
+                    <button 
+                        onClick={async () => {
+                            const toastId = toast.loading("Stopping generation...");
+                            try {
+                                const res = await fetch("/api/admin/reset-generation", { method: "POST" });
+                                if (res.ok) {
+                                    toast.success("Generation stopped!", { id: toastId });
+                                    setIsGenerating(false);
+                                    router.refresh();
+                                }
+                            } catch (e) {
+                                toast.error("Failed to stop", { id: toastId });
+                            }
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-amber-600 hover:bg-amber-50 transition-all"
+                    >
+                        <RotateCw className="w-4 h-4" /> Force Stop Gen
+                    </button>
+                )}
                 <div className="h-px bg-gray-50 my-1" />
                 <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-all">
                   <Trash2 className="w-4 h-4" /> Delete Series

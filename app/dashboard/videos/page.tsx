@@ -23,31 +23,43 @@ export default async function VideosPage() {
 
   const supabase = createAdminClient();
 
-  // Fetch all video records for the user's series
-  // We join with video_series to filter by userId and get the name
-  // We join with video_assets to get the first image for the thumbnail
-  const { data: videos, error } = await supabase
-    .from('video_records')
-    .select(`
-      *,
-      video_series!inner (
-        series_name,
-        user_id
-      ),
-      video_assets (
-        asset_url,
-        asset_type,
-        asset_index
-      )
-    `)
-    .eq('video_series.user_id', userId)
-    .order('created_at', { ascending: false });
+  let videos: any[] = [];
+  try {
+    // 1. Get user's series IDs
+    const { data: userSeries } = await supabase
+      .from('video_series')
+      .select('id')
+      .eq('user_id', userId);
+    
+    const seriesIds = userSeries?.map(s => s.id) || [];
 
-  if (error) {
-    console.error("Fetch videos error:", error);
+    if (seriesIds.length > 0) {
+      // 2. Fetch video records for those series
+      const { data, error: fetchError } = await supabase
+        .from('video_records')
+        .select(`
+          *,
+          video_series (
+            series_name,
+            user_id
+          ),
+          video_assets (
+            asset_url,
+            asset_type,
+            asset_index
+          )
+        `)
+        .in('series_id', seriesIds)
+        .order('created_at', { ascending: false });
+
+      if (fetchError) throw fetchError;
+      videos = data || [];
+    }
+  } catch (err) {
+    console.error("Videos Page Error:", err);
   }
 
-  const hasVideos = videos && videos.length > 0;
+  const hasVideos = videos.length > 0;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
