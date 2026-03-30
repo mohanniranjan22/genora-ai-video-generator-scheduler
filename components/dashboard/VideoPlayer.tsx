@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { Play, Pause, Volume2, Maximize2, SkipForward, SkipBack } from "lucide-react";
 import Image from "next/image";
 
@@ -10,6 +10,8 @@ interface VideoPlayerProps {
   videoTitle: string;
   seriesName: string;
   episodeNumber: number;
+  captions?: any[];
+  captionStyle?: string;
 }
 
 export default function VideoPlayer({ 
@@ -17,7 +19,9 @@ export default function VideoPlayer({
   audioUrl, 
   videoTitle, 
   seriesName, 
-  episodeNumber 
+  episodeNumber,
+  captions = [],
+  captionStyle = "modern-yellow"
 }: VideoPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -25,6 +29,87 @@ export default function VideoPlayer({
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  // Group Words into 2-word "bursts" to match the rendering engine
+  const bursts = useMemo(() => {
+    if (!captions || captions.length === 0) return [];
+    const grouped = [];
+    const wordsPerBurst = 2;
+    for (let i = 0; i < captions.length; i += wordsPerBurst) {
+      const chunk = captions.slice(i, i + wordsPerBurst);
+      grouped.push({
+        text: chunk.map((w: any) => w.word).join(" "),
+        start: chunk[0].start,
+        end: chunk[chunk.length - 1].end
+      });
+    }
+    return grouped;
+  }, [captions]);
+
+  // Dynamic Styling based on the selected ID exactly matching the engine
+  const getStyle = (styleId: string): React.CSSProperties => {
+    switch (styleId) {
+      case "minimalist":
+        return {
+          color: "white",
+          fontWeight: 500,
+          fontSize: "1.25rem",
+          textShadow: "0px 4px 10px rgba(0,0,0,0.3)",
+          textTransform: "none",
+        };
+      case "netflix":
+        return {
+          color: "white",
+          backgroundColor: "rgba(0,0,0,0.8)",
+          padding: "4px 12px",
+          borderRadius: "4px",
+          fontFamily: "Arial, sans-serif",
+          fontSize: "1.125rem",
+          textTransform: "none",
+        };
+      case "cyber-neon":
+        return {
+          color: "#00FF00",
+          fontWeight: "bold",
+          fontSize: "1.5rem",
+          fontStyle: "italic",
+          textShadow: "0 0 5px #00FF00, 0 0 10px #00FF00",
+          textTransform: "uppercase",
+        };
+      case "highlight":
+        return {
+          color: "white",
+          backgroundColor: "#9333ea", // purple-600
+          padding: "4px 12px",
+          borderRadius: "6px",
+          fontWeight: 900,
+          fontSize: "1.5rem",
+          textTransform: "uppercase",
+        };
+      case "pop-up":
+        return {
+          color: "white",
+          fontWeight: 900,
+          fontSize: "1.75rem",
+          textShadow: "2px 2px 10px rgba(0,0,0,0.5)",
+          textTransform: "uppercase",
+        };
+      case "modern-yellow":
+      default:
+        return {
+          color: "black",
+          backgroundColor: "#FFCC00",
+          padding: "4px 16px",
+          borderRadius: "4px",
+          fontWeight: 900,
+          fontSize: "1.5rem",
+          textTransform: "uppercase",
+          letterSpacing: "-0.5px",
+        };
+    }
+  };
+
+  const dynamicStyle = getStyle(captionStyle);
 
   useEffect(() => {
     if (!duration || images.length === 0) return;
@@ -138,6 +223,26 @@ export default function VideoPlayer({
           </div>
         </div>
 
+        {/* Live Caption Display Rendered Synced to CurrentTime */}
+        {captions && captions.length > 0 && isPlaying && (
+            <div className="absolute left-0 right-0 bottom-[25%] flex justify-center z-40 pointer-events-none px-4 text-center">
+                {bursts.map((burst, i) => {
+                    if (currentTime >= burst.start && currentTime <= burst.end) {
+                        return (
+                            <span 
+                              key={i} 
+                              style={{...dynamicStyle, lineHeight: '1.2'}} 
+                              className="inline-block animate-in zoom-in-95 duration-200"
+                            >
+                                {burst.text}
+                            </span>
+                        );
+                    }
+                    return null;
+                })}
+            </div>
+        )}
+        
         {/* Big Play Button for Idle State */}
         {!isPlaying && currentTime === 0 && (
             <div className="absolute inset-0 z-25 flex items-center justify-center">

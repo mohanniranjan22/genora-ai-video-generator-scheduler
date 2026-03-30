@@ -34,7 +34,8 @@ export default async function VideoDetailsPage({ params }: { params: { id: strin
         series_name,
         user_id,
         video_style,
-        voice
+        voice,
+        caption_style
       ),
       video_assets (
         *
@@ -90,6 +91,8 @@ export default async function VideoDetailsPage({ params }: { params: { id: strin
                 videoTitle={video.video_title}
                 seriesName={video.video_series.series_name}
                 episodeNumber={video.episode_number}
+                captions={video.captions || []}
+                captionStyle={video.video_series.caption_style || "modern-yellow"}
             />
         </div>
 
