@@ -41,7 +41,7 @@ export const MainComposition: React.FC<z.infer<typeof MainPropsSchema>> = ({
 
   // 2. Group Words into 2-3 word "bursts"
   const bursts = [];
-  const wordsPerBurst = 3;
+  const wordsPerBurst = 2; // 2 words per burst matches the image reference "DON'T FEEL"
   for (let i = 0; i < captions.length; i += wordsPerBurst) {
     const chunk = captions.slice(i, i + wordsPerBurst);
     bursts.push({
@@ -70,7 +70,7 @@ export const MainComposition: React.FC<z.infer<typeof MainPropsSchema>> = ({
 
       {/* Captions Layer */}
       <AbsoluteFill className="flex items-center justify-center pointer-events-none p-12">
-        <div className="mt-[60%] flex flex-wrap justify-center content-center w-full">
+        <div className="mt-[85%] flex flex-wrap justify-center content-center w-full">
           {bursts.map((burst, i) => {
             const startFrame = Math.floor(burst.start * fps);
             const endFrame = Math.floor(burst.end * fps);
@@ -209,11 +209,14 @@ const CaptionWord: React.FC<{ text: string; active: boolean; styleId: string }> 
       case "modern-yellow":
       default:
         return {
-          color: "#FCFF00",
+          color: "black",
+          backgroundColor: "#FFCC00", // Vibrant Yellow matched from image
+          padding: "5px 25px",
+          borderRadius: "6px",
           fontWeight: 900,
-          fontSize: "7rem",
+          fontSize: "6rem",
           textTransform: "uppercase",
-          textShadow: '4px 4px 0px #000, -4px -4px 0px #000, 4px -4px 0px #000, -4px 4px 0px #000, 0px 8px 30px rgba(0,0,0,0.3)',
+          letterSpacing: "-2px",
         };
     }
   };

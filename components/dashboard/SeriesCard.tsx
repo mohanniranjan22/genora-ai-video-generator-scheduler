@@ -21,6 +21,7 @@ export default function SeriesCard({ series }: { series: any }) {
   const router = useRouter();
   const [isPaused, setIsPaused] = useState(series.status === "paused");
   const [isGenerating, setIsGenerating] = useState(series.latestStatus === "processing");
+  const [isExecutingWorkflow, setIsExecutingWorkflow] = useState(false);
   const thumbnail = VIDEO_STYLE_MAP[series.video_style || "realistic"] || VIDEO_STYLE_MAP.realistic;
 
   const handleTriggerGeneration = async () => {
@@ -46,6 +47,32 @@ export default function SeriesCard({ series }: { series: any }) {
       toast.error("Internal server error", { id: toastId });
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleExecuteWorkflow = async () => {
+    setIsExecutingWorkflow(true);
+    const toastId = toast.loading("Executing full workflow (Test)...");
+    
+    try {
+      const response = await fetch("/api/execute-workflow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ seriesId: series.id }),
+      });
+
+      if (response.ok) {
+        toast.success("Workflow started! Check generation status.", { id: toastId });
+        router.push("/dashboard/videos");
+      } else {
+        const error = await response.json();
+        toast.error(`Error: ${error.error || "Failed to execute"}`, { id: toastId });
+      }
+    } catch (error) {
+      console.error("Execute error:", error);
+      toast.error("Internal server error", { id: toastId });
+    } finally {
+      setIsExecutingWorkflow(false);
     }
   };
 
@@ -204,13 +231,24 @@ export default function SeriesCard({ series }: { series: any }) {
           
           <button 
             onClick={handleTriggerGeneration}
-            disabled={isGenerating}
+            disabled={isGenerating || isExecutingWorkflow}
             className={`w-full h-10 px-4 flex items-center justify-center gap-2 rounded-xl text-white font-bold text-xs transition-all shadow-md group/gen ${
               isGenerating ? "bg-purple-400 cursor-not-allowed" : "bg-purple-600 hover:bg-purple-700 shadow-purple-100/50"
             }`}
           >
             <Zap className={`w-3.5 h-3.5 fill-white ${isGenerating ? "animate-spin" : "group-hover/gen:animate-pulse"}`} /> 
             {isGenerating ? "Generating..." : "Trigger Generation"}
+          </button>
+
+          <button 
+            onClick={handleExecuteWorkflow}
+            disabled={isGenerating || isExecutingWorkflow}
+            className={`w-full h-10 px-4 flex items-center justify-center gap-2 rounded-xl text-white font-bold text-xs transition-all shadow-md group/workflow ${
+              isExecutingWorkflow ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100/50"
+            }`}
+          >
+            <RotateCw className={`w-3.5 h-3.5 ${isExecutingWorkflow ? "animate-spin" : "group-hover/workflow:rotate-180 transition-transform duration-500"}`} /> 
+            {isExecutingWorkflow ? "Executing..." : "Execute Workflow"}
           </button>
         </div>
       </div>

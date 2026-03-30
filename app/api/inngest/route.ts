@@ -1,12 +1,21 @@
 import { serve } from "inngest/next";
 import { inngest } from "@/lib/inngest/client";
-import { helloWorld, generateVideo } from "@/lib/inngest/functions";
+import { 
+  helloWorld, 
+  generateVideo, 
+  publishVideo, 
+  orchestrateVideoWorkflow, 
+  dailyScheduleCron 
+} from "@/lib/inngest/functions";
 
 const handler = serve({
   client: inngest,
   functions: [
     helloWorld,
     generateVideo,
+    publishVideo,
+    orchestrateVideoWorkflow,
+    dailyScheduleCron,
   ],
 });
 

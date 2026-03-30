@@ -1,6 +1,8 @@
 import { inngest } from "./client";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { GoogleGenAI } from "@google/genai";
+import { sendEmail } from "../mail";
+import { refreshAccessToken, uploadToYoutube } from "../youtube";
 
 /**
  * Splits text into chunks of maximum character length, trying to preserve words.
@@ -376,5 +378,274 @@ export const generateVideo = inngest.createFunction(
       finalVideoUrl,
       imagesCount: generatedImages.length
     };
+  }
+);
+
+/**
+ * Publishes the generated video to configured platforms.
+ */
+export const publishVideo = inngest.createFunction(
+  { id: "publish-video", triggers: [{ event: "video/publish" }] },
+  async ({ event, step }) => {
+    const { seriesId, recordId, videoUrl } = event.data;
+    
+    // 1. Fetch Series & User data
+    const { series, user, videoRecord } = await step.run("fetch-publishing-data", async () => {
+      const supabase = createAdminClient();
+      
+      const { data: seriesData, error: sError } = await supabase
+        .from("video_series")
+        .select("*")
+        .eq("id", seriesId)
+        .single();
+        
+      if (sError) throw new Error(`Failed to fetch series data: ${sError.message}`);
+
+      const { data: userData, error: uError } = await supabase
+        .from("users")
+        .select("*")
+        .eq("user_id", seriesData.user_id)
+        .single();
+        
+      if (uError) throw new Error(`Failed to fetch user data: ${uError.message}`);
+      
+      const { data: recordData, error: rError } = await supabase
+        .from("video_records")
+        .select("episode_number")
+        .eq("id", recordId)
+        .single();
+        
+      if (rError) throw new Error(`Failed to fetch video record: ${rError.message}`);
+      
+      return { series: seriesData, user: userData, videoRecord: recordData };
+    });
+
+    const platforms = series.platforms || [];
+    const results: any = {};
+
+    // 2. Email Notification
+    if (platforms.includes("Email")) {
+      results.email = await step.run("send-email-notification", async () => {
+        return await sendEmail({
+          to: user.email,
+          subject: `✨ Your Video for "${series.series_name}" is Ready!`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+              <div style="background: #7c3aed; padding: 24px; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">Genora AI</h1>
+              </div>
+              <div style="padding: 24px;">
+                <h2 style="color: #1e293b; margin-top: 0;">Your content is live! 🎬</h2>
+                <p style="color: #475569; line-height: 1.6;">
+                  The latest episode for your series <strong>"${series.series_name}"</strong> has been generated and scheduled successfully.
+                </p>
+                <div style="margin: 32px 0; text-align: center;">
+                  <a href="${videoUrl}" style="background: #7c3aed; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold;">View Your Video</a>
+                </div>
+                <p style="color: #94a3b8; font-size: 14px;">
+                  Platforms scheduled: ${platforms.join(", ")}
+                </p>
+              </div>
+            </div>
+          `
+        });
+      });
+    }
+
+    // 3. Social Media Publishing
+    if (platforms.includes("Youtube")) {
+      results.youtube = await step.run("publish-youtube-video", async () => {
+        const supabase = createAdminClient();
+        
+        // 1. Fetch channel credentials
+        const { data: credentials, error: cError } = await supabase
+          .from("social_accounts")
+          .select("*")
+          .eq("user_id", user.user_id)
+          .eq("platform", "youtube")
+          .single();
+
+        if (cError || !credentials) {
+            console.error("🔴 [Publish] YouTube credentials not found");
+            return { error: "YouTube not connected" };
+        }
+
+        // 2. Token Refresh Logic
+        let { access_token, refresh_token, expires_at } = credentials;
+        const now = new Date();
+        const expiry = new Date(expires_at);
+
+        if (expiry.getTime() - now.getTime() < 300 * 1000) { // 5 mins buffer
+            console.log("🟠 [Publish] Refreshing YouTube access token...");
+            const { access_token: new_at, expires_in } = await refreshAccessToken(refresh_token);
+            access_token = new_at;
+            
+            // Save new token back to DB
+            await supabase
+              .from("social_accounts")
+              .update({ 
+                access_token: new_at, 
+                expires_at: new Date(Date.now() + expires_in * 1000).toISOString() 
+              })
+              .eq("id", credentials.id);
+        }
+
+        // 3. Fetch video into buffer
+        const videoRes = await fetch(videoUrl);
+        if (!videoRes.ok) throw new Error("Failed to fetch video file from URL");
+        const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
+
+        // 4. Upload to YouTube
+        const { videoId } = await uploadToYoutube(
+            videoBuffer, 
+            { 
+                title: `${series.series_name} - Episode #${videoRecord.episode_number}`, 
+                description: `Created with Genora AI. Series: ${series.series_name}`,
+                niche: series.niche 
+            }, 
+            access_token
+        );
+
+        console.log(`🟢 [Publish] YouTube Upload Complete: ${videoId}`);
+        return { success: true, videoId };
+      });
+    }
+
+    if (platforms.includes("Instagram")) {
+      results.instagram = await step.run("publish-instagram-placeholder", async () => {
+        console.log("🟠 [Publish] Instagram Publishing Placeholder (API Integration Pending)");
+        return { success: true, message: "Placeholder: Video would be posted as a Reel" };
+      });
+    }
+
+    if (platforms.includes("Tiktok")) {
+      results.tiktok = await step.run("publish-tiktok-placeholder", async () => {
+        console.log("🟠 [Publish] Tiktok Publishing Placeholder (API Integration Pending)");
+        return { success: true, message: "Placeholder: Video would be posted to TikTok" };
+      });
+    }
+
+    return { results };
+  }
+);
+
+/**
+ * Orchestrates the full video workflow: Generate -> Wait -> Publish
+ */
+export const orchestrateVideoWorkflow = inngest.createFunction(
+  { id: "orchestrate-video-workflow", triggers: [{ event: "video/workflow.scheduled" }] },
+  async ({ event, step }) => {
+    const { seriesId, isTest } = event.data;
+
+    // 1. Fetch Series data
+    const series = await step.run("fetch-series-ref", async () => {
+      const supabase = createAdminClient();
+      const { data } = await supabase.from("video_series").select("*").eq("id", seriesId).single();
+      return data;
+    });
+
+    // 2. Wait until 2 hours before Publish Time (Generation Start)
+    if (!isTest) {
+      const [hour, minute] = (series.publish_time || "18:00").split(":").map(Number);
+      const genStartDate = new Date();
+      genStartDate.setHours(hour - 2, minute, 0, 0);
+      
+      if (genStartDate.getTime() > Date.now()) {
+        await step.sleepUntil("wait-for-generation-start", genStartDate);
+      }
+    }
+
+    // 3. Trigger Generation
+    const genResult = await step.invoke("generate-video-step", {
+        function: generateVideo,
+        data: { seriesId }
+    });
+
+    // 3. Wait until Publish Time
+    if (!isTest) {
+      const [hour, minute] = (series.publish_time || "18:00").split(":").map(Number);
+      const publishDate = new Date();
+      publishDate.setHours(hour, minute, 0, 0);
+      
+      // If the time has already passed today, schedule for tomorrow
+      if (publishDate.getTime() <= Date.now()) {
+        publishDate.setDate(publishDate.getDate() + 1);
+      }
+      
+      await step.sleepUntil("wait-for-publish-time", publishDate);
+    } else {
+      await step.sleep("test-wait", "2s");
+    }
+
+    // 4. Trigger Publishing
+    return await step.invoke("publish-video-step", {
+        function: publishVideo,
+        data: { 
+            seriesId, 
+            recordId: genResult.recordId, 
+            videoUrl: genResult.finalVideoUrl 
+        }
+    });
+  }
+);
+
+/**
+ * Cron job to check for active series and schedule generation (2 hours before publish).
+ */
+export const dailyScheduleCron = inngest.createFunction(
+  { id: "daily-schedule-cron", triggers: [{ cron: "0 * * * *" }] }, // Run every hour
+  async ({ step }) => {
+    // 1. Fetch all active series
+    const activeSeries = await step.run("fetch-active-series", async () => {
+      const supabase = createAdminClient();
+      const { data } = await supabase
+        .from("video_series")
+        .select("id, publish_time, status")
+        .eq("status", "active");
+      return data || [];
+    });
+
+    const scheduled = [];
+
+    for (const series of activeSeries) {
+      const result = await step.run(`check-series-${series.id}`, async () => {
+        const [hour, minute] = (series.publish_time || "18:00").split(":").map(Number);
+        
+        // Calculate generation start time (2 hours before publish)
+        const genStartTime = new Date();
+        genStartTime.setHours(hour - 2, minute, 0, 0);
+        
+        const now = new Date();
+        const diffMs = genStartTime.getTime() - now.getTime();
+        const diffMinutes = diffMs / (1000 * 60);
+
+        // If generation should start in the next 60 minutes
+        if (diffMinutes > 0 && diffMinutes <= 60) {
+            // Check if we already scheduled something for this series today
+            const supabase = createAdminClient();
+            const today = new Date().toISOString().split('T')[0];
+            const { count } = await supabase
+                .from("video_records")
+                .select("*", { count: "exact", head: true })
+                .eq("series_id", series.id)
+                .gte("created_at", today);
+
+            if (!count || count === 0) {
+              return { shouldSchedule: true };
+            }
+        }
+        return { shouldSchedule: false };
+      });
+
+      if (result.shouldSchedule) {
+        await step.sendEvent(`trigger-workflow-${series.id}`, {
+          name: "video/workflow.scheduled",
+          data: { seriesId: series.id }
+        });
+        scheduled.push(series.id);
+      }
+    }
+
+    return { scheduledCount: scheduled.length, scheduledIds: scheduled };
   }
 );
