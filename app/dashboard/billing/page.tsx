@@ -69,14 +69,16 @@ export default function BillingPage() {
                 newSubscriptionRedirectUrl="/dashboard?success=billing"
               />
               
-              {/* Fallback info for development setup */}
-              <div className="mt-8 p-6 rounded-2xl bg-amber-50 border border-amber-100 text-amber-800 text-sm hidden group-has-[[data-clerk-error]]:block">
-                <p className="font-bold flex items-center gap-2 mb-1">
-                  <AlertTriangle className="w-4 h-4" /> 
-                  Billing Setup Required
-                </p>
-                <p>If you see a blank space above, please ensure <strong>Clerk Billing</strong> is enabled in your dashboard and you have created your pricing plans.</p>
-              </div>
+              {/* Fallback info for development setup or if billing is not configured */}
+              {!subscription && isLoaded && (
+                <div className="mt-8 p-6 rounded-2xl bg-amber-50 border border-amber-100 text-amber-800 text-sm">
+                  <p className="font-bold flex items-center gap-2 mb-1">
+                    <AlertTriangle className="w-4 h-4" /> 
+                    Premium Access Setup
+                  </p>
+                  <p>If you have already paid, your status will update automatically. If you see no plans above, please ensure your <a href="https://dashboard.clerk.com/last-active?path=billing/settings" target="_blank" className="font-black underline">Clerk Billing settings</a> are complete and plans are published.</p>
+                </div>
+              )}
             </div>
         </div>
       </div>

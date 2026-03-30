@@ -59,7 +59,7 @@ export async function uploadToYoutube(
           privacyStatus: "public",
           selfDeclaredMadeForKids: false,
         },
-      }) as any,
+      }),
     });
   
     if (!initiateRes.ok) {

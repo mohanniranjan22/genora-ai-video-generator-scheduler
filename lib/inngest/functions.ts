@@ -461,13 +461,13 @@ export const publishVideo = inngest.createFunction(
         const { data: credentials, error: cError } = await supabase
           .from("social_accounts")
           .select("*")
-          .eq("user_id", user.user_id)
+          .eq("user_id", user.user_id || (series as any).user_id)
           .eq("platform", "youtube")
           .single();
 
         if (cError || !credentials) {
-            console.error("🔴 [Publish] YouTube credentials not found");
-            return { error: "YouTube not connected" };
+            console.error("🔴 [Publish] YouTube credentials not found or not connected");
+            return { error: "YouTube not connected", status: "failed" };
         }
 
         // 2. Token Refresh Logic
@@ -492,14 +492,14 @@ export const publishVideo = inngest.createFunction(
 
         // 3. Fetch video into buffer
         const videoRes = await fetch(videoUrl);
-        if (!videoRes.ok) throw new Error("Failed to fetch video file from URL");
+        if (!videoRes.ok) throw new Error(`Failed to fetch video file from URL: ${videoUrl}`);
         const videoBuffer = Buffer.from(await videoRes.arrayBuffer());
 
         // 4. Upload to YouTube
         const { videoId } = await uploadToYoutube(
             videoBuffer, 
             { 
-                title: `${series.series_name} - Episode #${videoRecord.episode_number}`, 
+                title: `${series.series_name || "New Episode"} - Episode #${videoRecord.episode_number}`, 
                 description: `Created with Genora AI. Series: ${series.series_name}`,
                 niche: series.niche 
             }, 

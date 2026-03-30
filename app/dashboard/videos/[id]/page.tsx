@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-export default async function VideoDetailsPage({ params }: { params: { id: string } }) {
+export default async function VideoDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { userId } = await auth();
   const awaitedParams = await params;
   const id = awaitedParams.id;
